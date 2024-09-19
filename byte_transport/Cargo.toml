@@ -1,0 +1,13 @@
+[package]
+name = "byte_transport"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.89"
+bevy = { version = "0.14.2", optional = true }
+byte_transport_macros = { path = "../byte_transport_macros/"}
+
+[features]
+bevy = ["dep:bevy"]
+

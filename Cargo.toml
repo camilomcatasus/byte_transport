@@ -1,0 +1,6 @@
+[workspace]
+
+members = [
+    "byte_transport",
+    "byte_transport_macros"
+]

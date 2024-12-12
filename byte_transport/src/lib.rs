@@ -336,6 +336,29 @@ pub mod godot {
         }
     }
 
+    impl ByteEncode for Quaternion {
+        fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), crate::Error> {
+            self.x.simple_encode(bytes)?;
+            self.y.simple_encode(bytes)?;
+            self.z.simple_encode(bytes)?;
+            self.w.simple_encode(bytes)?;
+
+            Ok(())
+        }
+    }
+
+    impl ByteDecode for Quaternion {
+        fn simple_decode(decoder: &mut Decoder) -> Result<Self, crate::Error>
+            where Self: Sized {
+            Ok(Quaternion {
+                x: f32::simple_decode(decoder)?,
+                y: f32::simple_decode(decoder)?,
+                z: f32::simple_decode(decoder)?,
+                w: f32::simple_decode(decoder)?,
+            })
+        }
+    }
+
 
 }
 

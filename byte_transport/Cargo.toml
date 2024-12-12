@@ -7,7 +7,10 @@ edition = "2021"
 anyhow = "1.0.89"
 bevy = { version = "0.14.2", optional = true }
 byte_transport_macros = { path = "../byte_transport_macros/"}
+godot = { version = "0.2.1", optional = true }
 
 [features]
+default = ["godot"]
 bevy = ["dep:bevy"]
+godot = ["dep:godot"]
 

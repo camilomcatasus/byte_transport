@@ -292,6 +292,53 @@ where
     }
 }
 
+#[cfg(feature = "godot")]
+pub mod godot {
+    pub use super::{ByteDecode, ByteEncode, Decoder};
+
+    use godot::prelude::*;
+
+    impl ByteEncode for Vector3 {
+        fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), crate::Error> {
+            self.x.simple_encode(bytes)?;
+            self.y.simple_encode(bytes)?;
+            self.z.simple_encode(bytes)?;
+
+            Ok(())
+        }
+    }
+
+    impl ByteDecode for Vector3 {
+        fn simple_decode(decoder: &mut Decoder) -> Result<Self, crate::Error> {
+            Ok(Vector3 {
+                x: f32::simple_decode(decoder)?,
+                y: f32::simple_decode(decoder)?,
+                z: f32::simple_decode(decoder)?
+            })
+        }
+    }
+
+    impl ByteEncode for Vector2 {
+        fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), crate::Error> {
+            self.x.simple_encode(bytes)?;
+            self.y.simple_encode(bytes)?;
+
+            Ok(())
+        }
+    }
+
+    impl ByteDecode for Vector2 {
+        fn simple_decode(decoder: &mut Decoder) -> Result<Self, crate::Error> {
+            Ok(Vector2 {
+                x: f32::simple_decode(decoder)?,
+                y: f32::simple_decode(decoder)?,
+            })
+        }
+    }
+
+
+}
+
 #[cfg(feature = "bevy")]
 impl ByteDecode for Quat {
     fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error> {

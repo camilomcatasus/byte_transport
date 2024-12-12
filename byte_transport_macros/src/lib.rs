@@ -196,7 +196,7 @@ pub fn derive_byte_decode(input: TokenStream) -> TokenStream {
             });
             quote! {
                 impl ByteDecode for #name {
-                    fn simple_decode(decoder: &mut Decoder) -> Result<Self,byte_transport::Error> {
+                    fn simple_decode(decoder: &mut byte_transport::Decoder) -> Result<Self,byte_transport::Error> {
                         let variant_idx = u8::simple_decode(decoder)?;
                         match variant_idx {
                             #(#variant_decodes)*

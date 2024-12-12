@@ -1,12 +1,13 @@
-use anyhow::bail;
-use std::time::Duration;
+use std::{array::TryFromSliceError, time::Duration};
 use core::fmt::Debug;
 
+mod error;
 pub use byte_transport_macros::{ByteEncode, ByteDecode};
 
 #[cfg(feature = "bevy")]
 use bevy::prelude::*;
 
+pub use error::Error;
 
 pub struct Decoder {
     pub index: usize,
@@ -19,45 +20,45 @@ impl Decoder {
 }
 
 pub trait ByteEncode {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()>;
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error>;
 }
 
 impl ByteEncode for f64 {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         bytes.extend_from_slice(&f64::to_le_bytes(*self));
         Ok(())
     }
 }
 
 impl ByteEncode for f32 {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         bytes.extend_from_slice(&f32::to_le_bytes(*self));
         Ok(())
     }
 }
 impl ByteEncode for i64 {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         bytes.extend_from_slice(&i64::to_le_bytes(*self));
         Ok(())
     }
 }
 
 impl ByteEncode for i32 {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         bytes.extend_from_slice(&i32::to_le_bytes(*self));
         Ok(())
     }
 }
 
 impl ByteEncode for i16 {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         bytes.extend_from_slice(&i16::to_le_bytes(*self));
         Ok(())
     }
 }
 
 impl ByteEncode for i8 {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         bytes.extend_from_slice(&i8::to_le_bytes(*self));
         Ok(())
     }
@@ -65,35 +66,35 @@ impl ByteEncode for i8 {
 
 
 impl ByteEncode for u64 {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         bytes.extend_from_slice(&u64::to_le_bytes(*self));
         Ok(())
     }
 }
 
 impl ByteEncode for u32 {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         bytes.extend_from_slice(&u32::to_le_bytes(*self));
         Ok(())
     }
 }
 
 impl ByteEncode for u16 {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         bytes.extend_from_slice(&u16::to_le_bytes(*self));
         Ok(())
     }
 }
 
 impl ByteEncode for u8 {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         bytes.push(*self);
         Ok(())
     }
 }
 
 impl<T: ByteEncode> ByteEncode for Vec<T> {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         let vec_length: u16 = self.len() as u16;
         println!("Encoded Vec Length: {}", vec_length);
         vec_length.simple_encode(bytes)?;
@@ -108,7 +109,7 @@ impl<T, const N: usize> ByteEncode for [T; N]
 where
     T: ByteEncode,
 {   
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         for index in 0..N {
             self[index].simple_encode(bytes)?;
         }
@@ -144,73 +145,85 @@ impl ByteEncode for Transform {
 }
 
 pub trait ByteDecode {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self>
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self, Error>
     where Self: Sized;
 }
 
 impl<T: ByteDecode> ByteDecode for Vec<T> {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self> {
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self, Error> {
         let mut temp_vec = Vec::new();
 
         let decode_length = u16::simple_decode(decoder)?;
-        println!("Decode Length {}", decode_length);
         for _ in 0..decode_length {
             temp_vec.push(T::simple_decode(decoder)?);
         }
+
         Ok(temp_vec)
     }
 }
 
 impl ByteDecode for f64 {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self>
-        where Self: Sized {
-        
-        let byte_slice: [u8;8] = decoder.bytes[decoder.index..(decoder.index + 8)].try_into()?;
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error> {
+        let byte_slice_result: Result<[u8;8], TryFromSliceError> = decoder.bytes[decoder.index..(decoder.index + 8)].try_into();
+
         decoder.index += 8;
-        return Ok(f64::from_le_bytes(byte_slice));
+        match byte_slice_result {
+            Ok(byte_slice) => return Ok(f64::from_le_bytes(byte_slice)),
+            Err(_) => return Err(Error::SimpleDecodeTryFrom)
+        }
     }
 }
 
 impl ByteDecode for f32 {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self>
-        where Self: Sized {
-        
-        let byte_slice: [u8;4] = decoder.bytes[decoder.index..(decoder.index + 4)].try_into()?;
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error> {
+        let byte_slice_result: Result<[u8;4], TryFromSliceError> = decoder.bytes[decoder.index..(decoder.index + 4)].try_into();
+
         decoder.index += 4;
-        return Ok(f32::from_le_bytes(byte_slice));
+        match byte_slice_result {
+            Ok(byte_slice) => return Ok(f32::from_le_bytes(byte_slice)),
+            Err(_) => return Err(Error::SimpleDecodeTryFrom)
+        }
     }
 }
 
 impl ByteDecode for u64 {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self>
-        where Self: Sized {
-        
-        let byte_slice: [u8;8] = decoder.bytes[decoder.index..(decoder.index + 8)].try_into()?;
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error> {
+        let byte_slice_result: Result<[u8;8], TryFromSliceError> = decoder.bytes[decoder.index..(decoder.index + 8)].try_into();
+
         decoder.index += 8;
-        return Ok(u64::from_le_bytes(byte_slice));
+        match byte_slice_result {
+            Ok(byte_slice) => return Ok(u64::from_le_bytes(byte_slice)),
+            Err(_) => return Err(Error::SimpleDecodeTryFrom)
+        }
     }
 }
 
 impl ByteDecode for u32 {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self>
-        where Self: Sized {
-        
-        let byte_slice: [u8;4] = decoder.bytes[decoder.index..(decoder.index + 4)].try_into()?;
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error> {
+        let byte_slice_result: Result<[u8;4], TryFromSliceError> = decoder.bytes[decoder.index..(decoder.index + 4)].try_into();
+
         decoder.index += 4;
-        return Ok(u32::from_le_bytes(byte_slice));
+        match byte_slice_result {
+            Ok(byte_slice) => return Ok(u32::from_le_bytes(byte_slice)),
+            Err(_) => return Err(Error::SimpleDecodeTryFrom)
+        }
     }
 }
 
 impl ByteDecode for u16 {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self> {
-        let byte_slice: [u8;2] = decoder.bytes[decoder.index..(decoder.index + 2)].try_into()?;
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error> {
+        let byte_slice_result: Result<[u8;2], TryFromSliceError> = decoder.bytes[decoder.index..(decoder.index + 2)].try_into();
+
         decoder.index += 2;
-        return Ok(u16::from_le_bytes(byte_slice));
+        match byte_slice_result {
+            Ok(byte_slice) => return Ok(u16::from_le_bytes(byte_slice)),
+            Err(_) => return Err(Error::SimpleDecodeTryFrom)
+        }
     }
 }
 
 impl ByteDecode for u8 {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self> {
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error> {
         let byte = decoder.bytes[decoder.index];
         decoder.index += 1;
         return Ok(byte);
@@ -218,35 +231,44 @@ impl ByteDecode for u8 {
 }
 
 impl ByteDecode for i64 {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self>
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error>
         where Self: Sized {
         
-        let byte_slice: [u8;8] = decoder.bytes[decoder.index..(decoder.index + 8)].try_into()?;
+        let byte_slice_result: Result<[u8;8], TryFromSliceError > = decoder.bytes[decoder.index..(decoder.index + 8)].try_into();
         decoder.index += 8;
-        return Ok(i64::from_le_bytes(byte_slice));
+        match byte_slice_result {
+            Ok(byte_slice) => return Ok(i64::from_le_bytes(byte_slice)),
+            Err(_) => return Err(Error::SimpleDecodeTryFrom)
+        }
     }
 }
 
 impl ByteDecode for i32 {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self>
-        where Self: Sized {
-        
-        let byte_slice: [u8;4] = decoder.bytes[decoder.index..(decoder.index + 4)].try_into()?;
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error> {
+        let byte_slice_result: Result<[u8;4], TryFromSliceError> = decoder.bytes[decoder.index..(decoder.index + 4)].try_into();
+
         decoder.index += 4;
-        return Ok(i32::from_le_bytes(byte_slice));
+        match byte_slice_result {
+            Ok(byte_slice) => return Ok(i32::from_le_bytes(byte_slice)),
+            Err(_) => return Err(Error::SimpleDecodeTryFrom)
+        }
     }
 }
 
 impl ByteDecode for i16 {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self> {
-        let byte_slice: [u8;2] = decoder.bytes[decoder.index..(decoder.index + 2)].try_into()?;
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error> {
+        let byte_slice_result: Result<[u8;2], TryFromSliceError> = decoder.bytes[decoder.index..(decoder.index + 2)].try_into();
+
         decoder.index += 2;
-        return Ok(i16::from_le_bytes(byte_slice));
+        match byte_slice_result {
+            Ok(byte_slice) => return Ok(i16::from_le_bytes(byte_slice)),
+            Err(_) => return Err(Error::SimpleDecodeTryFrom)
+        }
     }
 }
 
 impl ByteDecode for i8 {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self> {
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error> {
         let byte = [decoder.bytes[decoder.index]];
         decoder.index += 1;
         return Ok(i8::from_le_bytes(byte));
@@ -257,7 +279,7 @@ impl<T, const N: usize> ByteDecode for [T; N]
 where
     T: ByteDecode + Debug,
 {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self>
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error>
         where Self: Sized {
         use std::mem::MaybeUninit;
         let mut arr: [T; N] = unsafe { MaybeUninit::uninit().assume_init() };
@@ -272,7 +294,7 @@ where
 
 #[cfg(feature = "bevy")]
 impl ByteDecode for Quat {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self> {
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error> {
         type Float4 = [f32;4];
         let quat_bytes = Float4::simple_decode(decoder)?;
 
@@ -282,7 +304,7 @@ impl ByteDecode for Quat {
 
 #[cfg(feature = "bevy")]
 impl ByteDecode for Vec3 {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self> {
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error> {
         Ok(Vec3 {
             x: f32::simple_decode(decoder)?,
             y: f32::simple_decode(decoder)?,
@@ -293,7 +315,7 @@ impl ByteDecode for Vec3 {
 
 #[cfg(feature = "bevy")]
 impl ByteDecode for Transform {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self> {
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error> {
         Ok(Transform {
             translation: Vec3::simple_decode(decoder)?,
             rotation: Quat::simple_decode(decoder)?,
@@ -303,18 +325,18 @@ impl ByteDecode for Transform {
 }
 
 impl<T: Sized + ByteDecode> ByteDecode for Option<T> {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self>
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error>
         where Self: Sized {
         match u8::simple_decode(decoder)? {
             SOME_FLAG => Ok(Some(T::simple_decode(decoder)?)),
             NONE_FLAG => Ok(None),
-            _ => bail!("Parse Error, Option flag not found")
+            _ => Err(Error::SimpleDecodeError("Parse Error, Option flag not found".to_string()))
         }
     }
 }
 
 impl<T: Sized + ByteEncode> ByteEncode for Option<T> {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         match self {
             Some(val) => {
                 SOME_FLAG.simple_encode(bytes)?;
@@ -329,7 +351,7 @@ impl<T: Sized + ByteEncode> ByteEncode for Option<T> {
 }
 
 impl ByteEncode for bool {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         match self {
             true => 1u8.simple_encode(bytes),
             false => 0u8.simple_encode(bytes),
@@ -338,24 +360,24 @@ impl ByteEncode for bool {
 }
 
 impl ByteDecode for bool {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self>
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error>
         where Self: Sized {
         match u8::simple_decode(decoder)? {
             0u8 => Ok(false),
             1u8 => Ok(true),
-            _ => bail!("Error parsing bool"),
+            _ => Err(Error::SimpleDecodeError("Error parsing bool".to_string())),
         }
     }
 }
 
 impl ByteEncode for Duration {
-    fn simple_encode(&self, bytes:&mut Vec<u8>) -> anyhow::Result<()> {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
         self.as_secs().simple_encode(bytes)
     }
 }
 
 impl ByteDecode for Duration {
-    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self>
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error>
         where Self: Sized {
         Ok(Duration::from_secs(u64::simple_decode(decoder)?))
     }
@@ -369,7 +391,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn u64_transport() -> anyhow::Result<()> {
+    fn u64_transport() -> Result<(), Error> {
         let mut bytes: Vec<u8> = Vec::new();
         let test_val = 5u64;
         test_val.simple_encode(&mut bytes)?;
@@ -384,7 +406,7 @@ mod tests {
     }
 
     #[test]
-    fn f32_transport() -> anyhow::Result<()> {
+    fn f32_transport() -> Result<(), Error> {
         let mut bytes: Vec<u8> = Vec::new();
         let test_val = 2.55f32;
         test_val.simple_encode(&mut bytes)?;
@@ -456,9 +478,9 @@ mod tests {
     }
 
     #[test]
-    fn simple_vector() -> anyhow::Result<()> {
+    fn simple_vector() -> Result<(), Error> {
         let mut bytes: Vec<u8> = Vec::new();
-        type val_type = Vec<u64>;
+        type ValType = Vec<u64>;
         let test_val: Vec<u64> = vec![
             5,
             3,
@@ -466,12 +488,12 @@ mod tests {
             9
         ];
 
-        test_val.simple_encode(&mut bytes);
+        test_val.simple_encode(&mut bytes)?;
         let mut decoder = Decoder {
             index: 0,
             bytes,
         };
-        let decoded_val = val_type::simple_decode(&mut decoder)?;
+        let decoded_val = ValType::simple_decode(&mut decoder)?;
         assert!(test_val == decoded_val, "Test Val: {:?} does not match Decoded Val: {:?}", test_val, decoded_val);
         Ok(())
     }

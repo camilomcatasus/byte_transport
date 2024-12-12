@@ -1,7 +1,7 @@
 extern crate proc_macro;
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::{parse_macro_input, DeriveInput, Data, Fields};
+use quote::{quote, ToTokens};
+use syn::{parse_macro_input, Data, DeriveInput, Field, Fields};
 
 // Derive macro for ByteEncode
 #[proc_macro_derive(ByteEncode)]
@@ -20,7 +20,7 @@ pub fn derive_byte_encode(input: TokenStream) -> TokenStream {
             });
             quote! {
                 impl ByteEncode for #name {
-                    fn simple_encode(&self, bytes: &mut Vec<u8>) -> anyhow::Result<()> {
+                    fn simple_encode(&self, bytes: &mut Vec<u8>) -> Result<(), byte_transport::Error> {
                         #(#field_encodes)*
                         Ok(())
                     }
@@ -39,26 +39,64 @@ pub fn derive_byte_encode(input: TokenStream) -> TokenStream {
                         }
                     },
                     Fields::Unnamed(ref fields) => {
-                        let field_encodes = fields.unnamed.iter().enumerate().map(|(i, _)| {
-                            let index = syn::Index::from(i);
+
+                        let field_names = fields.unnamed.iter().enumerate().map(|(i, _)| {
+                            let field_name = syn::Ident::new(&format!("field_{i}"), proc_macro2::Span::call_site());
                             quote! {
-                                ByteEncode::simple_encode(&self.#index, bytes)?;
+                                ref #field_name 
                             }
                         });
-                        quote! {
-                            Self::#variant_name(ref data) => {
-                                bytes.push(#idx);
+
+                        let field_encodes = fields.unnamed.iter().enumerate().map(|(i, _)| {
+                            let field_name = syn::Ident::new(&format!("field_{i}"), proc_macro2::Span::call_site());
+                            quote! {
+                                ByteEncode::simple_encode(#field_name, bytes)?;
+                            }
+                        });
+                        let encode_tokens = quote! {
+                            Self::#variant_name(#(#field_names),*) => {
+                                bytes.push(#idx); 
                                 #(#field_encodes)*
                                 Ok(())
                             }
-                        }
+                        };
+
+                        println!("{encode_tokens}");
+
+                        encode_tokens
                     },
-                    Fields::Named(_) => unimplemented!("Named fields in enums are not supported yet"),
+                    Fields::Named(ref named_fields) => {
+                        let struct_field_names = named_fields.named.iter().map(|field| {
+                            let ident = &field.ident;
+                            quote! {
+                                ref #ident
+                            }
+                        });
+
+                        let encode_fields = named_fields.named.iter().map(|field| {
+                            let ident = &field.ident;
+                            quote! {
+                                ByteEncode::simple_encode(#ident, bytes)?;
+                            }
+                        });
+
+                        let encode_tokens = quote! {
+                            Self::#variant_name{#(#struct_field_names),*} => {
+                                bytes.push(#idx); 
+                                #(#encode_fields)*
+                                Ok(())
+                            }
+                        };
+
+                        println!("{encode_tokens}");
+
+                        encode_tokens
+                    },
                 }
             });
             quote! {
                 impl ByteEncode for #name {
-                    fn simple_encode(&self, bytes: &mut Vec<u8>) -> anyhow::Result<()> {
+                    fn simple_encode(&self, bytes: &mut Vec<u8>) -> Result<(), byte_transport::Error> {
                         match *self {
                             #(#variant_encodes,)*
                         }
@@ -93,7 +131,7 @@ pub fn derive_byte_decode(input: TokenStream) -> TokenStream {
             });
             quote! {
                 impl ByteDecode for #name {
-                    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self> {
+                    fn simple_decode(decoder: &mut byte_transport::Decoder) -> Result<Self, byte_transport::Error> {
                         #(#field_decodes)*
                         Ok(Self {
                             #(#field_names),*
@@ -112,32 +150,57 @@ pub fn derive_byte_decode(input: TokenStream) -> TokenStream {
                         #idx => Ok(Self::#variant_name),
                     },
                     Fields::Unnamed(ref fields) => {
-                        let field_decodes = fields.unnamed.iter().map(|_| {
+                        println!("Fields {:?}", fields.to_token_stream());
+                        let field_decodes = fields.unnamed.iter().enumerate().map(|(i, field)| {
+                            let field_ident = syn::Ident::new(&format!("field_{i}"), proc_macro2::Span::call_site());
+                            
                             quote! {
-                                let field = ByteDecode::simple_decode(decoder)?;
+                                let #field_ident = #field::simple_decode(decoder)?;
                             }
                         });
+
                         let field_names = fields.unnamed.iter().enumerate().map(|(i, _)| {
-                            let index = syn::Index::from(i);
-                            quote! { field }
+                            syn::Ident::new(&format!("field_{i}"), proc_macro2::Span::call_site())
                         });
-                        quote! {
+
+                        let stream = quote! {
                             #idx => {
                                 #(#field_decodes)*
                                 Ok(Self::#variant_name(#(#field_names),*))
                             }
-                        }
+                        };
+                        println!("Unnamed Fields result: {stream}");
+                        stream
                     },
-                    Fields::Named(_) => unimplemented!("Named fields in enums are not supported yet"),
+                    Fields::Named(ref named_fields) => {
+                        let field_decodes = named_fields.named.iter().map(|named_field| {
+                            let field_ident = &named_field.ident;
+                            let field_type = &named_field.ty;
+                            quote! {
+                                #field_ident: #field_type::simple_decode(decoder)?,
+                            }
+                        });
+
+                        let stream = quote! {
+                            #idx => {
+                                Ok(Self::#variant_name {
+                                    #(#field_decodes)*
+                                })
+                            }
+                        };
+
+                        println!("Byte Decode implementation: {stream}");
+                        stream
+                    },
                 }
             });
             quote! {
                 impl ByteDecode for #name {
-                    fn simple_decode(decoder: &mut Decoder) -> anyhow::Result<Self> {
+                    fn simple_decode(decoder: &mut Decoder) -> Result<Self,byte_transport::Error> {
                         let variant_idx = u8::simple_decode(decoder)?;
                         match variant_idx {
                             #(#variant_decodes)*
-                            _ => Err(anyhow::anyhow!("Invalid enum variant index")),
+                            _ => Err(byte_transport::Error::DecodingEnumVariant(variant_idx)),
                         }
                     }
                 }

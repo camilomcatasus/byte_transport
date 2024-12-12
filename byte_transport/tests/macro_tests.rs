@@ -21,6 +21,7 @@ enum TestEnum {
         test_field: i32,
         test_field2: bool,
     },
+    D(Vec<i32>)
 }
 
 #[test]

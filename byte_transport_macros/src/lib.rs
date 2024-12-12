@@ -121,8 +121,9 @@ pub fn derive_byte_decode(input: TokenStream) -> TokenStream {
         Data::Struct(ref data) => {
             let field_decodes = data.fields.iter().map(|f| {
                 let name = &f.ident;
+                let field_type = &f.ty;
                 quote! {
-                    let #name = ByteDecode::simple_decode(decoder)?;
+                    let #name: #field_type = ByteDecode::simple_decode(decoder)?;
                 }
             });
             let field_names = data.fields.iter().map(|f| {
@@ -155,7 +156,7 @@ pub fn derive_byte_decode(input: TokenStream) -> TokenStream {
                             let field_ident = syn::Ident::new(&format!("field_{i}"), proc_macro2::Span::call_site());
                             
                             quote! {
-                                let #field_ident = #field::simple_decode(decoder)?;
+                                let #field_ident = ByteDecode::simple_decode(decoder)?;
                             }
                         });
 
@@ -177,7 +178,7 @@ pub fn derive_byte_decode(input: TokenStream) -> TokenStream {
                             let field_ident = &named_field.ident;
                             let field_type = &named_field.ty;
                             quote! {
-                                #field_ident: #field_type::simple_decode(decoder)?,
+                                #field_ident: ByteDecode::simple_decode(decoder)?,
                             }
                         });
 

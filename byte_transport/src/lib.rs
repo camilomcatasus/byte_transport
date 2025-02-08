@@ -64,6 +64,12 @@ impl ByteEncode for i8 {
     }
 }
 
+impl ByteEncode for u128 {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
+        bytes.extend_from_slice(&u128::to_le_bytes(*self));
+        Ok(())
+    }
+}
 
 impl ByteEncode for u64 {
     fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
@@ -181,6 +187,18 @@ impl ByteDecode for f32 {
         decoder.index += 4;
         match byte_slice_result {
             Ok(byte_slice) => return Ok(f32::from_le_bytes(byte_slice)),
+            Err(_) => return Err(Error::SimpleDecodeTryFrom)
+        }
+    }
+}
+
+impl ByteDecode for u128 {
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self,Error> {
+        let byte_slice_result: Result<[u8;16], TryFromSliceError> = decoder.bytes[decoder.index..(decoder.index + 16)].try_into();
+
+        decoder.index += 16;
+        match byte_slice_result {
+            Ok(byte_slice) => return Ok(u128::from_le_bytes(byte_slice)),
             Err(_) => return Err(Error::SimpleDecodeTryFrom)
         }
     }

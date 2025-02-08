@@ -453,6 +453,28 @@ impl ByteDecode for Duration {
     }
 }
 
+impl ByteEncode for String {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
+        let str_bytes = self.as_bytes();
+        let byte_len = u64::try_from(str_bytes.len()).unwrap();
+        byte_len.simple_encode(bytes);
+        bytes.extend_from_slice(str_bytes);
+        Ok(())
+    }
+}
+
+impl ByteDecode for String {
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self, Error>
+        where Self: Sized {
+        let byte_len = usize::try_from(u64::simple_decode(decoder)?).unwrap();
+        let str = String::from_utf8_lossy(&decoder.bytes[decoder.index..(decoder.index + byte_len)]);
+
+        decoder.index += byte_len;
+
+        Ok(str.into())
+    }
+}
+
 const SOME_FLAG: u8 = 1u8;
 const NONE_FLAG: u8 = 0u8;
 

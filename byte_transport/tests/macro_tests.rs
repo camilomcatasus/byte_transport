@@ -10,6 +10,7 @@ struct TestStruct {
 #[derive(ByteEncode, ByteDecode, PartialEq, Eq, Debug)]
 struct SubStruct {
     b: bool,
+    #[ig]
     integer_32: i32,
 }
 

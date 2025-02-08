@@ -4,7 +4,7 @@ use quote::{quote, ToTokens};
 use syn::{parse_macro_input, Data, DeriveInput, Field, Fields};
 
 // Derive macro for ByteEncode
-#[proc_macro_derive(ByteEncode)]
+#[proc_macro_derive(ByteEncode, attributes(ig))]
 pub fn derive_byte_encode(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -111,7 +111,7 @@ pub fn derive_byte_encode(input: TokenStream) -> TokenStream {
 }
 
 // Derive macro for ByteDecode
-#[proc_macro_derive(ByteDecode)]
+#[proc_macro_derive(ByteDecode, attributes(ig))]
 pub fn derive_byte_decode(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
@@ -119,7 +119,14 @@ pub fn derive_byte_decode(input: TokenStream) -> TokenStream {
 
     let decode_impl = match input.data {
         Data::Struct(ref data) => {
+
+            let ignored_fields = data.fields.iter().filter(|f| {
+                let attrs = &f.attrs;
+                false
+            });
+
             let field_decodes = data.fields.iter().map(|f| {
+                println!("Fields {:?}", f.to_token_stream());
                 let name = &f.ident;
                 let field_type = &f.ty;
                 quote! {
@@ -130,7 +137,7 @@ pub fn derive_byte_decode(input: TokenStream) -> TokenStream {
                 let name = &f.ident;
                 quote! { #name }
             });
-            quote! {
+            let stream = quote! {
                 impl ByteDecode for #name {
                     fn simple_decode(decoder: &mut byte_transport::Decoder) -> Result<Self, byte_transport::Error> {
                         #(#field_decodes)*
@@ -139,7 +146,10 @@ pub fn derive_byte_decode(input: TokenStream) -> TokenStream {
                         })
                     }
                 }
-            }
+            };
+
+            println!("Struct {name} \n{stream}");
+            stream
         },
          // Enum handling
         Data::Enum(ref data_enum) => {
@@ -175,6 +185,7 @@ pub fn derive_byte_decode(input: TokenStream) -> TokenStream {
                     },
                     Fields::Named(ref named_fields) => {
                         let field_decodes = named_fields.named.iter().map(|named_field| {
+                            println!("{:?}", named_field.to_token_stream());
                             let field_ident = &named_field.ident;
                             let field_type = &named_field.ty;
                             quote! {

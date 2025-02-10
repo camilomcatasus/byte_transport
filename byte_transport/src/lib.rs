@@ -293,6 +293,7 @@ impl ByteDecode for i8 {
     }
 }
 
+
 impl<T, const N: usize> ByteDecode for [T; N]
 where
     T: ByteDecode + Debug,
@@ -310,74 +311,72 @@ where
     }
 }
 
-#[cfg(feature = "godot")]
-pub mod godot {
-    pub use super::{ByteDecode, ByteEncode, Decoder};
 
-    use godot::prelude::*;
+#[cfg(feature = "godot_flag")]
+impl ByteEncode for godot::builtin::Vector3 {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), crate::Error> {
+        self.x.simple_encode(bytes)?;
+        self.y.simple_encode(bytes)?;
+        self.z.simple_encode(bytes)?;
 
-    impl ByteEncode for Vector3 {
-        fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), crate::Error> {
-            self.x.simple_encode(bytes)?;
-            self.y.simple_encode(bytes)?;
-            self.z.simple_encode(bytes)?;
-
-            Ok(())
-        }
+        Ok(())
     }
+}
 
-    impl ByteDecode for Vector3 {
-        fn simple_decode(decoder: &mut Decoder) -> Result<Self, crate::Error> {
-            Ok(Vector3 {
-                x: f32::simple_decode(decoder)?,
-                y: f32::simple_decode(decoder)?,
-                z: f32::simple_decode(decoder)?
-            })
-        }
+#[cfg(feature = "godot_flag")]
+impl ByteDecode for godot::builtin::Vector3 {
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self, crate::Error> {
+        Ok(Self {
+            x: f32::simple_decode(decoder)?,
+            y: f32::simple_decode(decoder)?,
+            z: f32::simple_decode(decoder)?
+        })
     }
+}
 
-    impl ByteEncode for Vector2 {
-        fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), crate::Error> {
-            self.x.simple_encode(bytes)?;
-            self.y.simple_encode(bytes)?;
+#[cfg(feature = "godot_flag")]
+impl ByteEncode for godot::builtin::Vector2 {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), crate::Error> {
+        self.x.simple_encode(bytes)?;
+        self.y.simple_encode(bytes)?;
 
-            Ok(())
-        }
+        Ok(())
     }
+}
 
-    impl ByteDecode for Vector2 {
-        fn simple_decode(decoder: &mut Decoder) -> Result<Self, crate::Error> {
-            Ok(Vector2 {
-                x: f32::simple_decode(decoder)?,
-                y: f32::simple_decode(decoder)?,
-            })
-        }
+#[cfg(feature = "godot_flag")]
+impl ByteDecode for godot::builtin::Vector2 {
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self, crate::Error> {
+        Ok(Self {
+            x: f32::simple_decode(decoder)?,
+            y: f32::simple_decode(decoder)?,
+        })
     }
+}
 
-    impl ByteEncode for Quaternion {
-        fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), crate::Error> {
-            self.x.simple_encode(bytes)?;
-            self.y.simple_encode(bytes)?;
-            self.z.simple_encode(bytes)?;
-            self.w.simple_encode(bytes)?;
+#[cfg(feature = "godot_flag")]
+impl ByteEncode for godot::builtin::Quaternion {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), crate::Error> {
+        self.x.simple_encode(bytes)?;
+        self.y.simple_encode(bytes)?;
+        self.z.simple_encode(bytes)?;
+        self.w.simple_encode(bytes)?;
 
-            Ok(())
-        }
+        Ok(())
     }
+}
 
-    impl ByteDecode for Quaternion {
-        fn simple_decode(decoder: &mut Decoder) -> Result<Self, crate::Error>
-            where Self: Sized {
-            Ok(Quaternion {
-                x: f32::simple_decode(decoder)?,
-                y: f32::simple_decode(decoder)?,
-                z: f32::simple_decode(decoder)?,
-                w: f32::simple_decode(decoder)?,
-            })
-        }
+#[cfg(feature = "godot_flag")]
+impl ByteDecode for godot::builtin::Quaternion {
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self, crate::Error>
+        where Self: Sized {
+        Ok(Self {
+            x: f32::simple_decode(decoder)?,
+            y: f32::simple_decode(decoder)?,
+            z: f32::simple_decode(decoder)?,
+            w: f32::simple_decode(decoder)?,
+        })
     }
-
-
 }
 
 #[cfg(feature = "bevy")]
@@ -386,7 +385,7 @@ impl ByteDecode for Quat {
         type Float4 = [f32;4];
         let quat_bytes = Float4::simple_decode(decoder)?;
 
-        Ok(Quat::from_array(quat_bytes))
+        Ok(Self::from_array(quat_bytes))
     }
 }
 
@@ -490,6 +489,30 @@ impl ByteDecode for String {
         decoder.index += byte_len;
 
         Ok(str.into())
+    }
+}
+
+#[cfg(feature = "macroquad")]
+impl ByteEncode for macroquad::color::Color {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
+        self.r.simple_encode(bytes)?;
+        self.g.simple_encode(bytes)?;
+        self.b.simple_encode(bytes)?;
+        self.a.simple_encode(bytes)?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "macroquad")]
+impl ByteDecode for macroquad::color::Color {
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self, Error>
+        where Self: Sized {
+        Ok(Self {
+            r: f32::simple_decode(decoder)?,
+            g: f32::simple_decode(decoder)?,
+            b: f32::simple_decode(decoder)?,
+            a: f32::simple_decode(decoder)?,
+        })
     }
 }
 

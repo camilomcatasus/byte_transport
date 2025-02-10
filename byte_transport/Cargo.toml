@@ -8,9 +8,10 @@ anyhow = "1.0.89"
 bevy = { version = "0.14.2", optional = true }
 byte_transport_macros = { path = "../byte_transport_macros/"}
 godot = { version = "0.2.1", optional = true }
+macroquad = { version = "0.4.13", optional = true }
 
 [features]
-default = ["godot"]
+default = []
 bevy = ["dep:bevy"]
-godot = ["dep:godot"]
-
+godot_flag = ["dep:godot"]
+macroquad = ["dep:macroquad"]

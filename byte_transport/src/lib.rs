@@ -516,6 +516,27 @@ impl ByteDecode for macroquad::color::Color {
     }
 }
 
+#[cfg(feature = "macroquad")]
+impl ByteEncode for macroquad::prelude::Vec2 {
+    fn simple_encode(&self, bytes:&mut Vec<u8>) -> Result<(), Error> {
+        self.x.simple_encode(bytes)?;
+        self.y.simple_encode(bytes)?;
+        Ok(())
+    }
+}
+
+#[cfg(feature = "macroquad")]
+impl ByteDecode for macroquad::prelude::Vec2 {
+    fn simple_decode(decoder: &mut Decoder) -> Result<Self, Error> 
+    where Self: Sized {
+        Ok(Self {
+            x: f32::simple_decode(decoder)?,
+            y: f32::simple_decode(decoder)?,
+        })
+    }
+}
+
+
 const SOME_FLAG: u8 = 1u8;
 const NONE_FLAG: u8 = 0u8;
 
